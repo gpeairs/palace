@@ -468,6 +468,11 @@ public:
   void PrintErrorIndicator(bool is_root,
                            const ErrorIndicator::SummaryStatistics &indicator_stats);
 
+  // Global indicator of each estimated eigenmode, in the same order as eig.csv.
+  void PrintErrorIndicatorModes(bool is_root,
+                                const std::vector<ErrorIndicator::SampleNorms> &mode_norms)
+    requires(solver_t == ProblemType::EIGENMODE);
+
   // "Delayed ctor" so that PostOperator can call it once it is fully constructed.
   // Set-up all files to be called from post_op.
   void InitializeCSVDataCollection(const PostOperator<solver_t> &post_op);

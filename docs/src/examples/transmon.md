@@ -240,7 +240,9 @@ include_example_file("transmon/transmon_coarse", "error-indicators.csv") #hide
 
 These error indicators provide metrics for estimating numerical accuracy across
 the computational domain, with the `Norm` column representing a measure related
-to the H(curl) seminorm of the solution error. When reducing to first order, the
+to the H(curl) seminorm of the solution error. The `η_e` and `η_m` columns
+split it into its electric and magnetic field parts, and `error-indicators-mode.csv`
+lists the same quantities for each eigenmode. When reducing to first order, the
 error norm increases by a factor of two, and the computed eigenfrequencies
 deviate noticeably from the converged values. While first-order simulations are
 valuable for rapid prototyping and debugging, second order (or higher) is

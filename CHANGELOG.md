@@ -19,6 +19,12 @@ See the [developer notes on schema versioning](https://awslabs.github.io/palace/
 
 #### New Features
 
+  - Added the electric and magnetic field parts of the global error indicator to the output,
+    as `η_e` and `η_m` columns in `error-indicators.csv`, for simulation types which solve for
+    both fields. Eigenmode simulations also write the global error indicator and its parts for
+    each requested mode to `error-indicators-mode.csv`. The indicator used for adaptive mesh
+    refinement is unchanged.
+    [PR XXX](https://github.com/awslabs/palace/pull/XXX).
   - Added total (geometric + kinetic) inductance extraction for thin-film superconductors. A
     `Boundaries.Superconductor` sheet carries the one-sided London kinetic sheet inductance
     `L_ksq = mu0 * lambda * coth(d/lambda)` (via `PenetrationDepth`/`Thickness`, or directly

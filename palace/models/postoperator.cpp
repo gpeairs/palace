@@ -2488,6 +2488,12 @@ void PostOperator<solver_t>::MeasureFinalize(const ErrorIndicator &indicator)
   {
     auto indicator_stats = indicator.GetSummaryStatistics(fem_op->GetComm());
     post_op_csv.PrintErrorIndicator(Mpi::Root(fem_op->GetComm()), indicator_stats);
+    if constexpr (solver_t == ProblemType::EIGENMODE)
+    {
+      // The eigenmode solver adds one sample per requested mode, in order.
+      post_op_csv.PrintErrorIndicatorModes(Mpi::Root(fem_op->GetComm()),
+                                           indicator.GetSampleNorms(fem_op->GetComm()));
+    }
   }
   if (ShouldWriteParaviewFields())
   {

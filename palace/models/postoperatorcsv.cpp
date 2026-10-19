@@ -1681,12 +1681,54 @@ void PostOperatorCSV<solver_t>::PrintErrorIndicator(
   }
 
   TableWithCSVFile error_indicator(post_dir / "error-indicators.csv");
-  error_indicator.table.reserve(1, 4);
+  error_indicator.table.reserve(1, 6);
 
   error_indicator.table.insert(Column("norm", "Norm") << indicator_stats.norm);
   error_indicator.table.insert(Column("min", "Minimum") << indicator_stats.min);
   error_indicator.table.insert(Column("max", "Maximum") << indicator_stats.max);
   error_indicator.table.insert(Column("mean", "Mean") << indicator_stats.mean);
+  // The field parts follow the summary statistics, so that the existing column positions
+  // are unchanged.
+  if (indicator_stats.eta_e && indicator_stats.eta_m)
+  {
+    error_indicator.table.insert(Column("eta_e", "η_e") << *indicator_stats.eta_e);
+    error_indicator.table.insert(Column("eta_m", "η_m") << *indicator_stats.eta_m);
+  }
+
+  error_indicator.WriteFullTableTrunc();
+}
+
+template <ProblemType solver_t>
+void PostOperatorCSV<solver_t>::PrintErrorIndicatorModes(
+    bool is_root, const std::vector<ErrorIndicator::SampleNorms> &mode_norms)
+  requires(solver_t == ProblemType::EIGENMODE)
+{
+  if (!is_root)
+  {
+    return;
+  }
+
+  TableWithCSVFile error_indicator(post_dir / "error-indicators-mode.csv");
+  error_indicator.table.reserve(mode_norms.size(), 4);
+  error_indicator.table.insert("idx", "m", -1, 0, PrecIndexCol(solver_t), "");
+  error_indicator.table.insert("norm", "Norm");
+  const bool has_field_parts =
+      !mode_norms.empty() && mode_norms.front().eta_e && mode_norms.front().eta_m;
+  if (has_field_parts)
+  {
+    error_indicator.table.insert("eta_e", "η_e");
+    error_indicator.table.insert("eta_m", "η_m");
+  }
+  for (std::size_t i = 0; i < mode_norms.size(); i++)
+  {
+    error_indicator.table["idx"] << static_cast<double>(i + 1);
+    error_indicator.table["norm"] << mode_norms[i].norm;
+    if (has_field_parts)
+    {
+      error_indicator.table["eta_e"] << *mode_norms[i].eta_e;
+      error_indicator.table["eta_m"] << *mode_norms[i].eta_m;
+    }
+  }
 
   error_indicator.WriteFullTableTrunc();
 }

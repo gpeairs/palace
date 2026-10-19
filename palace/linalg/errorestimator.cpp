@@ -276,6 +276,24 @@ Vector ComputeErrorEstimates(const VecType &F, VecType &F_gf, VecType &G, VecTyp
   return estimates;
 }
 
+// Record the indicator from the squared elemental errors in the electric flux (grad) and
+// magnetic field (curl), along with the two parts on their own. Both parts are normalized
+// by the same total field energy, so that η² = η_E² + η_B² for each element. The squared
+// errors are overwritten.
+void AddFieldPartsIndicator(Vector &grad_estimates, Vector &curl_estimates, double Et,
+                            ErrorIndicator &indicator)
+{
+  const double scale = (Et > 0.0) ? 0.5 / Et : 1.0;  // Correct factor of 1/2 in energy
+  Vector estimates(grad_estimates.Size());
+  estimates.UseDevice(true);
+  estimates = grad_estimates;
+  estimates += curl_estimates;
+  linalg::Sqrt(estimates, scale);
+  linalg::Sqrt(grad_estimates, scale);
+  linalg::Sqrt(curl_estimates, scale);
+  indicator.AddIndicator(estimates, grad_estimates, curl_estimates);
+}
+
 }  // namespace
 
 template <typename VecType>
@@ -552,10 +570,7 @@ void TimeDependentFluxErrorEstimator<VecType>::AddErrorIndicator(
       ComputeErrorEstimates(B, curl_estimator.B_gf, curl_estimator.H, curl_estimator.H_gf,
                             curl_estimator.rt_fespace, curl_estimator.nd_fespace,
                             curl_estimator.projector, curl_estimator.integ_op);
-  grad_estimates += curl_estimates;
-  linalg::Sqrt(grad_estimates,
-               (Et > 0.0) ? 0.5 / Et : 1.0);  // Correct factor of 1/2 in energy
-  indicator.AddIndicator(grad_estimates);
+  AddFieldPartsIndicator(grad_estimates, curl_estimates, Et, indicator);
 }
 
 template <typename VecType>
@@ -582,9 +597,7 @@ void BoundaryModeFluxErrorEstimator<VecType>::AddErrorIndicator(
       ComputeErrorEstimates(B, curl_estimator.B_gf, curl_estimator.H, curl_estimator.H_gf,
                             curl_estimator.rt_fespace, curl_estimator.nd_fespace,
                             curl_estimator.projector, curl_estimator.integ_op);
-  grad_estimates += curl_estimates;
-  linalg::Sqrt(grad_estimates, (Et > 0.0) ? 0.5 / Et : 1.0);
-  indicator.AddIndicator(grad_estimates);
+  AddFieldPartsIndicator(grad_estimates, curl_estimates, Et, indicator);
 }
 
 template class FluxProjector<Vector>;

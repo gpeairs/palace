@@ -828,7 +828,7 @@ implemented, which measures the error in the recovered magnetic field and electr
 density. On element ``K``, we have
 
 ```math
-\eta^2_K = \eta_{m,2}^2+\eta_{e,K}^2 =
+\eta^2_K = \eta_{m,K}^2+\eta_{e,K}^2 =
     \|\mu_r^{1/2}\bm{R}_{ND}(\mu^{-1}\bm{B})
     - (\mu_r^{-1/2}\bm{B})\|_{L^2(\Omega_K)}^2
     + \|\varepsilon_r^{-1/2}\bm{R}_{RT}(\varepsilon_r\bm{E})
@@ -838,6 +838,24 @@ density. On element ``K``, we have
 where ``\bm{R}_{ND}`` and ``\bm{R}_{RT}`` are the smooth-space recovery operators which
 orthogonally project their argument onto ``H(\text{curl})`` and ``H(\text{div})``,
 discretized by Nédélec and Raviart-Thomas elements, respectively.
+
+The global indicator ``\eta = (\sum_K \eta_K^2)^{1/2}``, normalized by the total field
+energy, is reported in the `Norm` column of `error-indicators.csv`. It is an estimate of the
+relative error of the solution, not a norm of the field itself. When several solutions
+contribute (eigenmodes, frequencies, or time steps), the elemental indicators are averaged
+in the root-mean-square sense, so ``\eta^2`` is the mean of the squared global indicators of
+the individual solutions. For simulation types which solve for both fields, the electric and
+magnetic parts ``\eta_e = (\sum_K \eta_{e,K}^2)^{1/2}`` and
+``\eta_m = (\sum_K \eta_{m,K}^2)^{1/2}`` are reported in the `η_e` and `η_m` columns. Both
+parts are normalized by the same total field energy, so ``\eta^2 = \eta_e^2 + \eta_m^2``,
+and ``\eta_e`` is not the relative error of the electric field alone. For eigenmode
+simulations, the global indicator and its parts for each requested mode are reported in
+`error-indicators-mode.csv`.
+
+The two parts are useful when studying eigenfrequency convergence: for a normalized
+eigenpair of a lossless problem with discretization error ``\bm{e}``, the eigenvalue error
+is ``\|\nabla\times\bm{e}\|^2_{\mu^{-1}} - \lambda\|\bm{e}\|^2_\varepsilon``, so magnetic
+and electric field errors move the computed frequency in opposite directions.
 
 ## Far-field extraction
 

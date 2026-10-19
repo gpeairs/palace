@@ -185,6 +185,122 @@ TEST_CASE("Flux error estimators on mixed-geometry meshes",
         },
         nd_fespace);
   }
+
+  SECTION("Time-dependent flux estimator field parts")
+  {
+    // The electric and magnetic field parts are the gradient and curl flux estimates with
+    // the shared energy normalization, and combine to the total in quadrature.
+    Vector E(nd_fespace.GetTrueVSize()), B(rt_fespace.GetTrueVSize());
+    E.UseDevice(true);
+    B.UseDevice(true);
+    FillRandom(E, 7);
+    FillRandom(B, 11);
+    constexpr double Et = 2.5;
+
+    ErrorIndicator ref_E, ref_B;
+    GradFluxErrorEstimator<Vector>(mat_op, nd_fespace, rt_fespaces, tol, max_it, print,
+                                   use_mg)
+        .AddErrorIndicator(E, Et, ref_E);
+    CurlFluxErrorEstimator<Vector>(mat_op, rt_fespace, nd_fespaces, tol, max_it, print,
+                                   use_mg)
+        .AddErrorIndicator(B, Et, ref_B);
+    REQUIRE_FALSE(ref_E.GetSummaryStatistics(comm).eta_e);
+
+    ErrorIndicator ind;
+    TimeDependentFluxErrorEstimator<Vector>(mat_op, nd_fespaces, rt_fespaces, tol, max_it,
+                                            print, use_mg)
+        .AddErrorIndicator(E, B, Et, ind);
+
+    Vector expected(ind.Local().Size());
+    {
+      const auto *he = ref_E.Local().HostRead();
+      const auto *hb = ref_B.Local().HostRead();
+      auto *hx = expected.HostWrite();
+      for (int i = 0; i < expected.Size(); i++)
+      {
+        hx[i] = std::sqrt(he[i] * he[i] + hb[i] * hb[i]);
+      }
+    }
+    Compare(ind.Local(), expected, "total from field parts");
+
+    const auto stats = ind.GetSummaryStatistics(comm);
+    REQUIRE(stats.eta_e);
+    REQUIRE(stats.eta_m);
+    CHECK_THAT(*stats.eta_e, WithinRel(ref_E.Norml2(comm), 1.0e-12));
+    CHECK_THAT(*stats.eta_m, WithinRel(ref_B.Norml2(comm), 1.0e-12));
+  }
+}
+
+// The per-sample global indicators and the field parts are kept alongside the running
+// average, which must remain consistent with them.
+TEST_CASE("ErrorIndicator field parts and sample norms",
+          "[errorestimator][Serial][Parallel]")
+{
+  const auto comm = MPI_COMM_WORLD;
+  constexpr int ne = 5;
+  const int rank = Mpi::Rank(comm);
+  auto Make = [&](double scale)
+  {
+    Vector v(ne);
+    auto *h = v.HostWrite();
+    for (int i = 0; i < ne; i++)
+    {
+      h[i] = scale * (1.0 + i + 0.5 * rank);
+    }
+    return v;
+  };
+  auto Total = [&](const Vector &E, const Vector &B)
+  {
+    Vector v(ne);
+    const auto *he = E.HostRead();
+    const auto *hb = B.HostRead();
+    auto *h = v.HostWrite();
+    for (int i = 0; i < ne; i++)
+    {
+      h[i] = std::sqrt(he[i] * he[i] + hb[i] * hb[i]);
+    }
+    return v;
+  };
+
+  // Two samples with different balances of electric and magnetic error.
+  const Vector E1 = Make(1.0), B1 = Make(3.0), E2 = Make(4.0), B2 = Make(0.5);
+  const Vector T1 = Total(E1, B1), T2 = Total(E2, B2);
+  ErrorIndicator ind;
+  ind.AddIndicator(T1, E1, B1);
+  ind.AddIndicator(T2, E2, B2);
+
+  const auto norms = ind.GetSampleNorms(comm);
+  REQUIRE(norms.size() == 2);
+  const double n1 = linalg::Norml2(comm, T1), n2 = linalg::Norml2(comm, T2);
+  CHECK_THAT(norms[0].norm, WithinRel(n1, 1.0e-14));
+  CHECK_THAT(norms[1].norm, WithinRel(n2, 1.0e-14));
+  CHECK_THAT(*norms[0].eta_e, WithinRel(linalg::Norml2(comm, E1), 1.0e-14));
+  CHECK_THAT(*norms[0].eta_m, WithinRel(linalg::Norml2(comm, B1), 1.0e-14));
+  CHECK_THAT(*norms[1].eta_e, WithinRel(linalg::Norml2(comm, E2), 1.0e-14));
+  CHECK_THAT(*norms[1].eta_m, WithinRel(linalg::Norml2(comm, B2), 1.0e-14));
+
+  // The global indicator of the average and its field parts are the RMS of the per-sample
+  // indicators, and the field parts combine to the total in quadrature.
+  const auto stats = ind.GetSummaryStatistics(comm);
+  CHECK_THAT(stats.norm * stats.norm, WithinRel(0.5 * (n1 * n1 + n2 * n2), 1.0e-14));
+  CHECK_THAT(*stats.eta_e * *stats.eta_e,
+             WithinRel(0.5 * (std::pow(*norms[0].eta_e, 2) + std::pow(*norms[1].eta_e, 2)),
+                       1.0e-14));
+  CHECK_THAT(*stats.eta_m * *stats.eta_m,
+             WithinRel(0.5 * (std::pow(*norms[0].eta_m, 2) + std::pow(*norms[1].eta_m, 2)),
+                       1.0e-14));
+  CHECK_THAT(stats.norm * stats.norm,
+             WithinRel(*stats.eta_e * *stats.eta_e + *stats.eta_m * *stats.eta_m, 1.0e-14));
+
+  // Single-field indicators report per-sample norms without field parts.
+  ErrorIndicator single;
+  single.AddIndicator(E1);
+  single.AddIndicator(E2);
+  const auto single_norms = single.GetSampleNorms(comm);
+  REQUIRE(single_norms.size() == 2);
+  CHECK_FALSE(single_norms[0].eta_e);
+  CHECK_THAT(single_norms[1].norm, WithinRel(linalg::Norml2(comm, E2), 1.0e-14));
+  CHECK_FALSE(single.GetSummaryStatistics(comm).eta_e);
 }
 
 }  // namespace palace

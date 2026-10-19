@@ -16,7 +16,10 @@ for eigenmodes. The computed eigenvalues are written to an ASCII file named `eig
 the directory specified by
 [`config["Problem"]["Output"]`](../config/reference.md#config-problem). Also in
 this file are the mode quality factors and errors (absolute and backward) computed for each
-eigenpair.
+eigenpair. The global error indicator of each of the `N` requested eigenmodes, along with
+its electric and magnetic field parts (see
+[Error estimation](../reference.md#Error-estimation-and-adaptive-mesh-refinement-(AMR))),
+is written to `error-indicators-mode.csv`.
 
 Calculations related to
 [energy-participation ratio (EPR) quantization](https://www.nature.com/articles/s41534-021-00461-8)
